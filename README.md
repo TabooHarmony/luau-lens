@@ -13,13 +13,15 @@ Add to your MCP client config (Claude Code, Cursor, etc.):
   "mcpServers": {
     "luau-lens": {
       "command": "uvx",
-      "args": ["luau-lens"]
+      "args": ["--from", "git+https://github.com/TabooHarmony/luau-lens", "luau-lens"]
     }
   }
 }
 ```
 
 That's it. On first run, luau-lens downloads `luau-lsp`, `selene`, and `stylua` automatically. No manual setup.
+
+> **Note:** Not yet on PyPI. The git URL is required for now. Once published, the config will simplify to `"args": ["luau-lens"]`.
 
 ## How it works
 
