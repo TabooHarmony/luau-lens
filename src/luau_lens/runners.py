@@ -123,6 +123,12 @@ def check_file(filepath: str) -> dict:
 
     luau_results = run_luau_lsp(abs_path)
     selene_results = run_selene(abs_path)
+
+    # Normalize file paths to the absolute path we passed in
+    for d in luau_results + selene_results:
+        if not os.path.isabs(d.file):
+            d.file = abs_path
+
     merged = merge_diagnostics(luau_results, selene_results)
     return to_dict(merged)
 
