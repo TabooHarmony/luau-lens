@@ -22,6 +22,7 @@ def test() -> bool:
     paths = bootstrap.get_paths()
     print(f"   luau-lsp: {paths['luau_lsp']} ({'exists' if paths['luau_lsp'].exists() else 'MISSING'})")
     print(f"   selene:   {paths['selene']} ({'exists' if paths['selene'].exists() else 'MISSING'})")
+    print(f"   stylua:   {paths['stylua']} ({'exists' if paths['stylua'].exists() else 'MISSING'})")
     print(f"   defs:     {paths['defs']} ({'exists' if paths['defs'].exists() else 'MISSING'})")
     print()
 
@@ -160,6 +161,60 @@ def test() -> bool:
         all_pass = False
     elif diags[0].line != 1:  # 0-indexed → 1-indexed
         print(f"   FAIL: wrong line number (expected 1, got {diags[0].line})")
+        all_pass = False
+    else:
+        print("   PASS")
+    print()
+
+    # Test 9: StyLua format — already formatted code
+    print("10. Test: format_code — already formatted code")
+    clean_code = 'local function add(a: number, b: number): number\n\treturn a + b\nend\n'
+    result = runners.run_stylua_format(clean_code)
+    changed = result.get("changed", True)
+    formatted = result.get("formatted_code", "")
+    print(f"   changed={changed}")
+    print(f"   formatted matches input: {formatted == clean_code}")
+    if "error" in result:
+        print(f"   FAIL: {result['error']}")
+        all_pass = False
+    elif changed:
+        print("   FAIL: code was already formatted, changed should be False")
+        all_pass = False
+    else:
+        print("   PASS")
+    print()
+
+    # Test 10: StyLua format — unformatted code
+    print("11. Test: format_code — unformatted code gets fixed")
+    bad_code = 'local function add(a:number,b:number)\nreturn a+b\nend'
+    result = runners.run_stylua_format(bad_code)
+    changed = result.get("changed", False)
+    formatted = result.get("formatted_code", "")
+    print(f"   changed={changed}")
+    print(f"   formatted code:\n   {repr(formatted)}")
+    if "error" in result:
+        print(f"   FAIL: {result['error']}")
+        all_pass = False
+    elif not changed:
+        print("   FAIL: code needed formatting, changed should be True")
+        all_pass = False
+    elif formatted == bad_code:
+        print("   FAIL: formatted code is identical to input")
+        all_pass = False
+    else:
+        print("   PASS")
+    print()
+
+    # Test 11: check_code includes formatting diagnostic for unformatted code
+    print("12. Test: check_code detects formatting issues")
+    bad_format = 'local x=1\nlocal y    =    2\n'
+    result = runners.check_code(bad_format)
+    stylua_diags = [d for d in result.get("diagnostics", []) if d.get("source") == "stylua"]
+    print(f"   stylua diagnostics: {len(stylua_diags)}")
+    for d in stylua_diags:
+        print(f"   [{d['severity']}] {d['source']}: {d['message']}")
+    if len(stylua_diags) < 1:
+        print("   FAIL: expected at least 1 stylua formatting diagnostic")
         all_pass = False
     else:
         print("   PASS")

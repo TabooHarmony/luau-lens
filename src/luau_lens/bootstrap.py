@@ -35,6 +35,7 @@ DEFS_FILENAME = "globalTypes.d.luau"
 # Binary download URLs (filled by _get_urls)
 LUAU_LSP_VERSION = "1.68.1"
 SELENE_VERSION = "0.31.0"
+STYLUA_VERSION = "2.5.2"
 
 # Re-download definitions if older than this (seconds)
 DEFS_MAX_AGE = 7 * 24 * 60 * 60  # 7 days
@@ -55,7 +56,9 @@ def _get_platform() -> tuple[str, str]:
     if os_name == "windows":
         return "windows", "x86_64"
     if os_name == "darwin":
-        return "macos", "universal"  # macos zip is universal
+        if "arm" in machine or "aarch" in machine:
+            return "macos", "arm64"
+        return "macos", "x86_64"
 
     # linux
     if "arm" in machine or "aarch" in machine:
@@ -68,20 +71,30 @@ def _get_urls() -> dict[str, str]:
     base = {
         "luau-lsp": {
             ("windows", "x86_64"): f"https://github.com/JohnnyMorganz/luau-lsp/releases/download/{LUAU_LSP_VERSION}/luau-lsp-win64.zip",
-            ("macos", "universal"): f"https://github.com/JohnnyMorganz/luau-lsp/releases/download/{LUAU_LSP_VERSION}/luau-lsp-macos.zip",
+            ("macos", "arm64"): f"https://github.com/JohnnyMorganz/luau-lsp/releases/download/{LUAU_LSP_VERSION}/luau-lsp-macos.zip",
+            ("macos", "x86_64"): f"https://github.com/JohnnyMorganz/luau-lsp/releases/download/{LUAU_LSP_VERSION}/luau-lsp-macos.zip",
             ("linux", "x86_64"): f"https://github.com/JohnnyMorganz/luau-lsp/releases/download/{LUAU_LSP_VERSION}/luau-lsp-linux-x86_64.zip",
             ("linux", "arm64"): f"https://github.com/JohnnyMorganz/luau-lsp/releases/download/{LUAU_LSP_VERSION}/luau-lsp-linux-arm64.zip",
         },
         "selene": {
             ("windows", "x86_64"): f"https://github.com/Kampfkarren/selene/releases/download/{SELENE_VERSION}/selene-{SELENE_VERSION}-windows.zip",
-            ("macos", "universal"): f"https://github.com/Kampfkarren/selene/releases/download/{SELENE_VERSION}/selene-{SELENE_VERSION}-macos.zip",
+            ("macos", "arm64"): f"https://github.com/Kampfkarren/selene/releases/download/{SELENE_VERSION}/selene-{SELENE_VERSION}-macos.zip",
+            ("macos", "x86_64"): f"https://github.com/Kampfkarren/selene/releases/download/{SELENE_VERSION}/selene-{SELENE_VERSION}-macos.zip",
             ("linux", "x86_64"): f"https://github.com/Kampfkarren/selene/releases/download/{SELENE_VERSION}/selene-{SELENE_VERSION}-linux.zip",
             ("linux", "arm64"): f"https://github.com/Kampfkarren/selene/releases/download/{SELENE_VERSION}/selene-{SELENE_VERSION}-linux.zip",
+        },
+        "stylua": {
+            ("windows", "x86_64"): f"https://github.com/JohnnyMorganz/StyLua/releases/download/v{STYLUA_VERSION}/stylua-windows-x86_64.zip",
+            ("macos", "arm64"): f"https://github.com/JohnnyMorganz/StyLua/releases/download/v{STYLUA_VERSION}/stylua-macos-aarch64.zip",
+            ("macos", "x86_64"): f"https://github.com/JohnnyMorganz/StyLua/releases/download/v{STYLUA_VERSION}/stylua-macos-x86_64.zip",
+            ("linux", "x86_64"): f"https://github.com/JohnnyMorganz/StyLua/releases/download/v{STYLUA_VERSION}/stylua-linux-x86_64.zip",
+            ("linux", "arm64"): f"https://github.com/JohnnyMorganz/StyLua/releases/download/v{STYLUA_VERSION}/stylua-linux-aarch64.zip",
         },
     }
     return {
         "luau-lsp": base["luau-lsp"][(os_name, arch)],
         "selene": base["selene"][(os_name, arch)],
+        "stylua": base["stylua"][(os_name, arch)],
     }
 
 
@@ -196,6 +209,14 @@ def ensure_tools() -> None:
         if not selene_path.exists():
             print(f"[luau-lens] WARNING: selene binary not found, linting will be skipped", file=sys.stderr)
 
+    # stylua binary
+    stylua_path = BIN_DIR / _exe("stylua")
+    if not stylua_path.exists():
+        print(f"[luau-lens] downloading stylua v{STYLUA_VERSION}...", file=sys.stderr)
+        _download_and_extract_zip(urls["stylua"], BIN_DIR)
+        if not stylua_path.exists():
+            print(f"[luau-lens] WARNING: stylua binary not found, formatting will be skipped", file=sys.stderr)
+
     # Roblox type definitions (re-download if stale)
     defs_path = DEFS_DIR / DEFS_FILENAME
     need_defs = not defs_path.exists()
@@ -220,6 +241,7 @@ def get_paths() -> dict[str, Path]:
     return {
         "luau_lsp": BIN_DIR / _exe("luau-lsp"),
         "selene": BIN_DIR / _exe("selene"),
+        "stylua": BIN_DIR / _exe("stylua"),
         "defs": DEFS_DIR / DEFS_FILENAME,
         "selene_toml": CONFIG_DIR / "selene.toml",
         "luaurc": CONFIG_DIR / ".luaurc",
@@ -229,3 +251,8 @@ def get_paths() -> dict[str, Path]:
 def has_selene() -> bool:
     """Check if selene binary exists."""
     return (BIN_DIR / _exe("selene")).exists()
+
+
+def has_stylua() -> bool:
+    """Check if stylua binary exists."""
+    return (BIN_DIR / _exe("stylua")).exists()
