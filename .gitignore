@@ -9,3 +9,4 @@ build/
 *.luau
 *.lua
 !tests/**/*.luau
+!tests/**/*.lua

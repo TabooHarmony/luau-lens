@@ -43,7 +43,7 @@ All three run automatically on every check. Results are merged into structured J
 ## Requirements
 
 - `uv` (installed automatically by most MCP clients)
-- Internet access on first run (to download ~29MB of binaries and type definitions)
+- Internet access on first run (to download ~11MB of binaries and type definitions, ~31MB extracted)
 
 ## License
 

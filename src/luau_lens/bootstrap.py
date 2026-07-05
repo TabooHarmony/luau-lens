@@ -29,7 +29,8 @@ DEFS_DIR = CACHE_DIR / "defs"
 CONFIG_DIR = CACHE_DIR / "config"
 
 # Type definitions URL (maintained by JohnnyMorganz/luau-lsp)
-DEFS_URL = "https://luau-lsp.pages.dev/type-definitions/globalTypes.PluginSecurity.d.luau"
+# Full API types — not PluginSecurity subset, which would cause false positives for game scripts
+DEFS_URL = "https://luau-lsp.pages.dev/type-definitions/globalTypes.d.luau"
 DEFS_FILENAME = "globalTypes.d.luau"
 
 # Binary download URLs (filled by _get_urls)
@@ -42,6 +43,7 @@ DEFS_MAX_AGE = 7 * 24 * 60 * 60  # 7 days
 
 _ensure_done = False
 _ready = False
+_last_error: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -180,12 +182,24 @@ def is_ready() -> bool:
     return _ready
 
 
+def last_error() -> str | None:
+    """Return the last bootstrap error, or None if bootstrap succeeded."""
+    return _last_error
+
+
 def ensure_tools() -> None:
-    """Download all required tools if not present. Called once on startup."""
-    global _ensure_done, _ready
-    if _ensure_done:
+    """Download all required tools if not present. Called once on startup.
+
+    If a previous attempt failed, calling again will retry the download.
+    """
+    global _ensure_done, _ready, _last_error
+
+    # If already ready, skip. If a previous attempt failed (_ready=False but
+    # _ensure_done=True), allow retry by resetting _ensure_done.
+    if _ready:
         return
     _ensure_done = True
+    _last_error = None
 
     urls = _get_urls()
     BIN_DIR.mkdir(parents=True, exist_ok=True)
@@ -195,27 +209,40 @@ def ensure_tools() -> None:
     luau_lsp_path = BIN_DIR / _exe("luau-lsp")
     if not luau_lsp_path.exists():
         print(f"[luau-lens] downloading luau-lsp v{LUAU_LSP_VERSION}...", file=sys.stderr)
-        _download_and_extract_zip(urls["luau-lsp"], BIN_DIR)
+        try:
+            _download_and_extract_zip(urls["luau-lsp"], BIN_DIR)
+        except Exception as e:
+            _last_error = f"Failed to download luau-lsp: {e}"
+            print(f"[luau-lens] ERROR: {_last_error}", file=sys.stderr)
+            return
         if not luau_lsp_path.exists():
-            print(f"[luau-lens] ERROR: luau-lsp binary not found after extraction", file=sys.stderr)
-            _ready = False
+            _last_error = "luau-lsp binary not found after extraction"
+            print(f"[luau-lens] ERROR: {_last_error}", file=sys.stderr)
             return
 
     # selene binary
     selene_path = BIN_DIR / _exe("selene")
     if not selene_path.exists():
         print(f"[luau-lens] downloading selene v{SELENE_VERSION}...", file=sys.stderr)
-        _download_and_extract_zip(urls["selene"], BIN_DIR)
-        if not selene_path.exists():
-            print(f"[luau-lens] WARNING: selene binary not found, linting will be skipped", file=sys.stderr)
+        try:
+            _download_and_extract_zip(urls["selene"], BIN_DIR)
+        except Exception as e:
+            print(f"[luau-lens] WARNING: selene download failed: {e}, linting will be skipped", file=sys.stderr)
+        else:
+            if not selene_path.exists():
+                print(f"[luau-lens] WARNING: selene binary not found, linting will be skipped", file=sys.stderr)
 
     # stylua binary
     stylua_path = BIN_DIR / _exe("stylua")
     if not stylua_path.exists():
         print(f"[luau-lens] downloading stylua v{STYLUA_VERSION}...", file=sys.stderr)
-        _download_and_extract_zip(urls["stylua"], BIN_DIR)
-        if not stylua_path.exists():
-            print(f"[luau-lens] WARNING: stylua binary not found, formatting will be skipped", file=sys.stderr)
+        try:
+            _download_and_extract_zip(urls["stylua"], BIN_DIR)
+        except Exception as e:
+            print(f"[luau-lens] WARNING: stylua download failed: {e}, formatting will be skipped", file=sys.stderr)
+        else:
+            if not stylua_path.exists():
+                print(f"[luau-lens] WARNING: stylua binary not found, formatting will be skipped", file=sys.stderr)
 
     # Roblox type definitions (re-download if stale)
     defs_path = DEFS_DIR / DEFS_FILENAME
@@ -227,10 +254,20 @@ def ensure_tools() -> None:
             print("[luau-lens] refreshing Roblox type definitions (stale)...", file=sys.stderr)
     if need_defs:
         print("[luau-lens] downloading Roblox type definitions...", file=sys.stderr)
-        _download_file(DEFS_URL, defs_path)
+        try:
+            _download_file(DEFS_URL, defs_path)
+        except Exception as e:
+            _last_error = f"Failed to download type definitions: {e}"
+            print(f"[luau-lens] ERROR: {_last_error}", file=sys.stderr)
+            return
 
     # Config files
     _write_configs()
+
+    # Warn if selene was downloaded but is the wrong architecture (no native arm64 Linux build)
+    os_name, arch = _get_platform()
+    if os_name == "linux" and arch == "arm64" and selene_path.exists():
+        print("[luau-lens] WARNING: selene has no native Linux arm64 build; linting may not work on this platform", file=sys.stderr)
 
     _ready = True
     print("[luau-lens] ready", file=sys.stderr)

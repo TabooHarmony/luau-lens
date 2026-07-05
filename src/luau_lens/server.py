@@ -47,6 +47,7 @@ def check_code(code: str, filename: str = "snippet.luau") -> dict:
             ],
             "summary": {"errors": 1, "warnings": 0, "total": 1}
         }
+        On error, returns {"error": "description of what went wrong"}.
     """
     return runners.check_code(code, filename)
 
@@ -62,6 +63,7 @@ def check_file(filepath: str) -> dict:
 
     Returns:
         Same structured diagnostics format as check_code.
+        On error, returns {"error": "description of what went wrong"}.
     """
     return runners.check_file(filepath)
 
@@ -77,6 +79,7 @@ def check_project(directory: str) -> dict:
 
     Returns:
         Same structured diagnostics format as check_code, with diagnostics across all files.
+        On error, returns {"error": "description of what went wrong"}.
     """
     return runners.check_project(directory)
 
@@ -97,6 +100,7 @@ def format_code(code: str, filename: str = "snippet.luau") -> dict:
             "changed": true
         }
         If the code was already formatted, changed will be false and formatted_code will match the input.
+        On error, returns {"error": "description of what went wrong"}.
     """
     return runners.run_stylua_format(code, filename)
 
