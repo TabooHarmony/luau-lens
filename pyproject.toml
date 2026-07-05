@@ -1,6 +1,6 @@
 [project]
 name = "luau-lens"
-version = "0.1.0"
+version = "1.0.0"
 description = "MCP server that gives AI agents instant Luau type checking and linting for Roblox development"
 readme = "README.md"
 license = {text = "MIT"}
